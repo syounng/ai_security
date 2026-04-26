@@ -20,6 +20,7 @@ class Policy(BaseModel):
     name: str
     natural_language: str
     rule_ids: List[str]
+    previous_rule_ids: List[str] = []
     status: Literal["draft", "active", "inactive"]
     version: int
     created_at: str

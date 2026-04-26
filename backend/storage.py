@@ -83,8 +83,6 @@ def update_policy(policy_id: str, natural_language: str, rules_data: List[dict])
     data = _load()
     now = datetime.now(timezone.utc).isoformat()
 
-    data["rules"] = [r for r in data["rules"] if r["policy_id"] != policy_id]
-
     rules = []
     rule_ids = []
     for rd in rules_data:
@@ -101,6 +99,7 @@ def update_policy(policy_id: str, natural_language: str, rules_data: List[dict])
 
     for p in data["policies"]:
         if p["id"] == policy_id:
+            p["previous_rule_ids"] = p.get("rule_ids", [])
             p["natural_language"] = natural_language
             p["rule_ids"] = rule_ids
             p["version"] += 1
@@ -126,6 +125,11 @@ def rollback_policy(policy_id: str) -> Policy:
     data = _load()
     for p in data["policies"]:
         if p["id"] == policy_id:
-            p["status"] = "inactive"
+            prev = p.get("previous_rule_ids", [])
+            if prev:
+                p["rule_ids"], p["previous_rule_ids"] = prev, p["rule_ids"]
+                p["version"] = max(1, p["version"] - 1)
+                p["updated_at"] = datetime.now(timezone.utc).isoformat()
+            p["status"] = "draft"
     _save(data)
     return get_policy(policy_id)
