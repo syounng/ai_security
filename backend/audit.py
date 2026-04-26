@@ -20,8 +20,12 @@ def get_all(limit: int = 50) -> List[AuditEntry]:
     return list(reversed(entries))[:limit]
 
 
+def get_by_group(group_id: str, limit: int = 50) -> List[AuditEntry]:
+    return [e for e in get_all(limit=200) if e.policy_group_id == group_id][:limit]
+
+
 def record(
-    policy_id: str,
+    policy_group_id: str,
     policy_name: str,
     version_from: Optional[int],
     version_to: int,
@@ -29,7 +33,7 @@ def record(
     changed_by: str = "operator",
 ) -> AuditEntry:
     entry = AuditEntry(
-        policy_id=policy_id,
+        policy_group_id=policy_group_id,
         policy_name=policy_name,
         version_from=version_from,
         version_to=version_to,
