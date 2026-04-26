@@ -1,5 +1,6 @@
 "use client";
-import { Policy } from "@/lib/api";
+import { useState } from "react";
+import { Policy, PolicyType } from "@/lib/api";
 
 type Props = {
   policies: Policy[];
@@ -15,14 +16,46 @@ const STATUS_BADGE: Record<string, string> = {
   archived: "bg-red-900 text-red-400",
 };
 
+const TYPE_GROUPS: { key: PolicyType | "all"; label: string }[] = [
+  { key: "all",            label: "전체" },
+  { key: "prompt_defense", label: "프롬프트 방어" },
+  { key: "sensitive_data", label: "민감정보" },
+  { key: "content_safety", label: "콘텐츠 안전" },
+  { key: "compliance",     label: "컴플라이언스" },
+];
+
 export default function PolicyList({ policies, selectedId, onSelect, onDeploy, onRollback }: Props) {
+  const [activeType, setActiveType] = useState<PolicyType | "all">("all");
+
+  const filtered = activeType === "all"
+    ? policies
+    : policies.filter(p => p.policy_type === activeType);
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">정책 목록</h2>
-      {policies.length === 0 && (
+
+      {/* Category filter tabs */}
+      <div className="flex flex-wrap gap-1">
+        {TYPE_GROUPS.map(g => (
+          <button
+            key={g.key}
+            onClick={() => setActiveType(g.key)}
+            className={`text-xs px-2 py-1 rounded transition-colors ${
+              activeType === g.key
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+            }`}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 && (
         <p className="text-gray-600 text-sm py-4 text-center">등록된 정책이 없습니다.</p>
       )}
-      {policies.map(p => (
+      {filtered.map(p => (
         <div
           key={p.id}
           onClick={() => onSelect(p)}

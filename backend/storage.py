@@ -13,6 +13,7 @@ def _to_policy(p: PolicyORM) -> Policy:
         policy_group_id=p.policy_group_id,
         name=p.name,
         natural_language=p.natural_language,
+        policy_type=p.policy_type or "content_safety",
         status=p.status,
         version=p.version,
         created_at=p.created_at.isoformat() if p.created_at else "",
@@ -91,14 +92,15 @@ def get_rules_for_policy(db: Session, policy_id: str) -> List[Rule]:
     return [_to_rule(r) for r in rows]
 
 
-def create_policy(db: Session, name: str, natural_language: str, rules_data: List[dict]) -> Tuple[Policy, List[Rule]]:
+def create_policy(db: Session, name: str, natural_language: str, rules_data: List[dict], policy_type: str = "content_safety") -> Tuple[Policy, List[Rule]]:
     now = datetime.now(timezone.utc)
     group_id = f"policy-{uuid.uuid4().hex[:8]}"
     policy_id = f"{group_id}-v1"
 
     orm = PolicyORM(
         id=policy_id, policy_group_id=group_id, name=name,
-        natural_language=natural_language, status="draft", version=1, created_at=now,
+        natural_language=natural_language, policy_type=policy_type,
+        status="draft", version=1, created_at=now,
     )
     db.add(orm)
     rule_orms = _build_rules(db, policy_id, rules_data)
@@ -122,8 +124,8 @@ def revise_policy(db: Session, group_id: str, natural_language: str, rules_data:
 
     orm = PolicyORM(
         id=new_id, policy_group_id=group_id, name=latest.name,
-        natural_language=natural_language, status="draft",
-        version=new_version, created_at=now,
+        natural_language=natural_language, policy_type=latest.policy_type,
+        status="draft", version=new_version, created_at=now,
     )
     db.add(orm)
     rule_orms = _build_rules(db, new_id, rules_data)

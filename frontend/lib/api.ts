@@ -1,5 +1,7 @@
 const BASE = "http://localhost:8000";
 
+export type PolicyType = "prompt_defense" | "sensitive_data" | "content_safety" | "compliance";
+
 export type Rule = {
   id: string;
   policy_id: string;
@@ -14,6 +16,7 @@ export type Policy = {
   policy_group_id: string;
   name: string;
   natural_language: string;
+  policy_type: PolicyType;
   status: "draft" | "active" | "archived";
   version: number;
   created_at: string;
@@ -69,10 +72,10 @@ export const api = {
       `/policies/${groupId}/versions/${version}`
     ),
 
-  createPolicy: (name: string, natural_language: string, change_reason: string) =>
+  createPolicy: (name: string, natural_language: string, change_reason: string, policy_type: PolicyType = "content_safety") =>
     req<{ policy: Policy; rules: Rule[]; translation_source: string }>(
       "/policies",
-      { method: "POST", body: JSON.stringify({ name, natural_language, change_reason }) }
+      { method: "POST", body: JSON.stringify({ name, natural_language, change_reason, policy_type }) }
     ),
 
   revisePolicy: (groupId: string, natural_language: string, change_reason: string) =>

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { api, Policy, Rule, Diff } from "@/lib/api";
+import { api, Policy, Rule, Diff, PolicyType } from "@/lib/api";
 
 type Props = {
   selectedPolicy: Policy | null;
@@ -19,6 +19,7 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
   const [name, setName] = useState("");
   const [naturalLanguage, setNaturalLanguage] = useState("");
   const [changeReason, setChangeReason] = useState("");
+  const [policyType, setPolicyType] = useState<PolicyType>("content_safety");
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,7 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
         onUpdated(res.policy, res.rules, res.diff);
       } else {
         if (!name.trim()) { setError("정책 이름을 입력하세요."); setLoading(false); return; }
-        const res = await api.createPolicy(name, naturalLanguage, changeReason || "최초 생성");
+        const res = await api.createPolicy(name, naturalLanguage, changeReason || "최초 생성", policyType);
         setRules(res.rules);
         onCreated(res.policy, res.rules);
       }
@@ -80,12 +81,24 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
       </h2>
 
       {!isEditing && (
-        <input
-          className="w-full bg-gray-800 text-gray-100 border border-gray-600 rounded px-3 py-2 text-sm placeholder-gray-500"
-          placeholder="정책 이름 (예: 기본 보안 정책)"
-          value={name}
-          onChange={e => setName(e.target.value)}
-        />
+        <>
+          <input
+            className="w-full bg-gray-800 text-gray-100 border border-gray-600 rounded px-3 py-2 text-sm placeholder-gray-500"
+            placeholder="정책 이름 (예: 기본 보안 정책)"
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
+          <select
+            className="w-full bg-gray-800 text-gray-100 border border-gray-600 rounded px-3 py-2 text-sm"
+            value={policyType}
+            onChange={e => setPolicyType(e.target.value as PolicyType)}
+          >
+            <option value="prompt_defense">프롬프트 방어</option>
+            <option value="sensitive_data">민감정보</option>
+            <option value="content_safety">콘텐츠 안전</option>
+            <option value="compliance">컴플라이언스</option>
+          </select>
+        </>
       )}
 
       <textarea

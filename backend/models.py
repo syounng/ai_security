@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from typing import Literal, Optional, List
 
+PolicyType = Literal["prompt_defense", "sensitive_data", "content_safety", "compliance"]
+
 
 class Rule(BaseModel):
     id: str
@@ -16,6 +18,7 @@ class Policy(BaseModel):
     policy_group_id: str
     name: str
     natural_language: str
+    policy_type: PolicyType = "content_safety"
     status: Literal["draft", "active", "archived"]
     version: int
     created_at: str
@@ -25,6 +28,7 @@ class CreatePolicyRequest(BaseModel):
     name: str
     natural_language: str
     change_reason: str = "최초 생성"
+    policy_type: PolicyType = "content_safety"
 
 
 class ReviseRequest(BaseModel):

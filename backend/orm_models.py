@@ -10,6 +10,7 @@ class PolicyORM(Base):
     policy_group_id = Column(String, nullable=False, index=True)
     name = Column(String, nullable=False)
     natural_language = Column(String, nullable=False)
+    policy_type = Column(String, nullable=False, default="content_safety")
     status = Column(String, nullable=False, default="draft")
     version = Column(Integer, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

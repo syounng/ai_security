@@ -57,7 +57,7 @@ def create_policy(req: CreatePolicyRequest, db: Session = Depends(get_db)):
     if not result["success"]:
         suggestion = llm_client.suggest_rephrasing(req.natural_language)
         raise HTTPException(422, detail={"error": "번역 실패", "suggestion": suggestion})
-    policy, rules = storage.create_policy(db, req.name, req.natural_language, result["rules"])
+    policy, rules = storage.create_policy(db, req.name, req.natural_language, result["rules"], req.policy_type)
     audit.record(
         policy_group_id=policy.policy_group_id,
         policy_name=policy.name,
