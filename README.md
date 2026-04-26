@@ -3,6 +3,16 @@
 AI 에이전트의 행동을 제어하는 **자연어 기반 보안 정책 관리 시스템**입니다.  
 운영자가 자연어로 정책을 작성하면 Gemini API가 실행 가능한 룰로 자동 변환하고, 룰 엔진이 실시간으로 입력을 평가합니다.
 
+### 문서
+
+- [시스템 설계 및 기술 발표자료](docs/presentation.md)
+- [정책 평가 테스트 결과 (200개 케이스)](docs/policy-test-report-2026-04-26.md)
+- [기술 스택 설계서 — 아키텍처 선택 근거 및 데이터 모델](docs/superpowers/specs/2026-04-26-tech-stack-design.md)
+- [구현 계획 — 전체 시스템 초기 설계](docs/superpowers/plans/2026-04-26-guardrail-control-plane.md)
+- [구현 계획 — PRD v2 마이그레이션 (SQLite 전환 및 버전 관리)](docs/superpowers/plans/2026-04-26-prd-v2-migration.md)
+- [구현 계획 — 정책 유형별 Gemini 프롬프트 전문화](docs/superpowers/plans/2026-04-26-policy-type-specialization.md)
+- [구현 계획 — 룰 변경 미리보기 (저장 전 Gemini 추천 확인)](docs/superpowers/plans/2026-04-26-rule-change-preview.md)
+
 ---
 
 ## 주요 기능
