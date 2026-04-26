@@ -8,6 +8,7 @@ AUDIT_FILE = Path(__file__).parent.parent / "data" / "audit.jsonl"
 
 
 def append(entry: AuditEntry) -> None:
+    AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
     with AUDIT_FILE.open("a", encoding="utf-8") as f:
         f.write(entry.model_dump_json() + "\n")
 
@@ -16,7 +17,13 @@ def get_all(limit: int = 50) -> List[AuditEntry]:
     if not AUDIT_FILE.exists():
         return []
     lines = AUDIT_FILE.read_text(encoding="utf-8").strip().splitlines()
-    entries = [AuditEntry(**json.loads(line)) for line in lines if line]
+    entries = []
+    for line in lines:
+        if line:
+            try:
+                entries.append(AuditEntry(**json.loads(line)))
+            except (json.JSONDecodeError, Exception):
+                continue
     return list(reversed(entries))[:limit]
 
 
