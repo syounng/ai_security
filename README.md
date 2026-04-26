@@ -46,6 +46,87 @@ Guardrail Control Plane은 이 문제를 해결합니다.
 
 ---
 
+### 시스템 설계 (Miro 보드)
+
+> 다이어그램은 Miro 보드에서 확인할 수 있습니다.
+
+#### 1. 전체 시스템 아키텍처 → [다이어그램 보기](https://miro.com/app/board/uXjVHc-hJtg=/?moveToWidget=3458764669376830484)
+
+정책 생성과 입력 평가, 두 가지 흐름으로 동작합니다.
+
+- **정책 생성 흐름**: Frontend → `POST /policies` → 키워드 번역 (코드) → 실패 시 Gemini API 폴백 → SQLite 저장
+- **입력 평가 흐름**: Frontend → `POST /evaluate` → SQLite에서 룰 로드 → 룰 엔진 매칭 → 우선순위 기반 판정 → Gemini가 한국어 설명 생성 → 결과 반환
+
+---
+
+#### 2. 데이터 구조 ERD → [다이어그램 보기](https://miro.com/app/board/uXjVHc-hJtg=/?moveToWidget=3458764669371350994)
+
+4개 엔티티와 관계입니다.
+
+| 엔티티 | 설명 | 주요 필드 |
+|--------|------|-----------|
+| **Policy** | 보안 정책 단위 | id, name, natural_language, status, version |
+| **Rule** | Policy에 속한 실행 규칙 | id, policy_id(FK), action, description |
+| **RuleCondition** | Rule 발동 조건 (Rule에 내장) | type(category\|contains\|regex), value |
+| **AuditEntry** | 불변 변경 이력 | policy_id(FK), version_from, version_to, changed_by, change_reason, timestamp |
+
+관계: Policy →(1:N)→ Rule →(1:1)→ RuleCondition / AuditEntry →(N:1)→ Policy
+
+---
+
+#### 3. 데이터 구조 상세 설명 → [문서 보기](https://miro.com/app/board/uXjVHc-hJtg=/?moveToWidget=3458764669371605130)
+
+**Policy 상태 흐름**
+```
+draft ──[deploy]──→ active ──[rollback]──→ inactive ──[rollback]──→ draft
+```
+
+**Rule 액션 우선순위**
+
+| 순위 | 액션 | 의미 |
+|------|------|------|
+| 1 | `block` | 요청 완전 차단 |
+| 2 | `approval` | 사람 승인 필요 |
+| 3 | `mask` | 민감정보 마스킹 |
+| 4 | `pass` | 통과 허용 |
+
+**RuleCondition 타입**
+
+| 타입 | 방식 | 예시 |
+|------|------|------|
+| `category` | 내장 정규식 패턴 묶음 | `prompt_injection`, `sensitive_data`, `payment_api`, `unsafe_action` |
+| `contains` | 대소문자 무시 문자열 포함 검사 | `"rm -rf"` |
+| `regex` | 운영자 작성 정규표현식 | `\d{6}-\d{7}` |
+
+**저장 구조**: `policies.json` (Policy + Rule) / `audit.jsonl` (AuditEntry, Append-only)
+
+---
+
+#### 4. 룰 매칭 판단 로직 플로우차트 → [다이어그램 보기](https://miro.com/app/board/uXjVHc-hJtg=/?moveToWidget=3458764669373590645)
+
+`backend/rule_engine.py`의 동작 흐름입니다.
+
+1. 입력 텍스트 수신
+2. Policy에 연결된 **모든 Rule 순회** (첫 매칭에서 멈추지 않음)
+3. 각 Rule의 조건 타입에 따라 매칭 수행 (regex / contains / category)
+4. 매칭된 Rule ID와 매칭 문자열 누적
+5. **가장 높은 우선순위 액션** 선택 → 결과 반환
+
+---
+
+#### 5. 룰 매칭 판단 로직 상세 설명 → [문서 보기](https://miro.com/app/board/uXjVHc-hJtg=/?moveToWidget=3458764669373590845)
+
+**조건 타입별 동작**
+
+- **category**: 카테고리에 등록된 정규식 목록을 순서대로 검사. 하나라도 매칭되면 통과. `matched_text` 반환
+- **contains**: `value.lower() in text.lower()` 단순 포함 검사. 가장 빠르지만 `matched_text`는 None
+- **regex**: 운영자 작성 정규식으로 `re.search()` 검사. 잘못된 패턴은 예외 처리 후 None 반환 (서비스 중단 없음)
+
+**여러 룰이 동시에 매칭되는 경우**: 모든 룰을 끝까지 순회 후 우선순위가 가장 높은 액션 하나만 최종 반환.
+예) block 룰 + mask 룰 동시 매칭 → 최종 결과는 **block**
+
+---
+
 ### 문서
 
 - [시스템 설계 및 기술 발표자료](docs/presentation.md)
