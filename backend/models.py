@@ -64,3 +64,7 @@ class AuditEntry(BaseModel):
     changed_by: str
     change_reason: str
     timestamp: str
+
+
+class PreviewPolicyRequest(BaseModel):
+    natural_language: str
