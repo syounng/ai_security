@@ -1,8 +1,9 @@
 const BASE = "http://localhost:8000";
 
+export type PolicyType = "prompt_defense" | "sensitive_data" | "content_safety" | "compliance";
 export type RuleCondition = { type: "category" | "contains" | "regex"; value: string };
 export type Rule = { id: string; policy_id: string; action: "block" | "mask" | "approval" | "pass"; condition: RuleCondition; description: string };
-export type Policy = { id: string; name: string; natural_language: string; rule_ids: string[]; status: "draft" | "active" | "inactive"; version: number; created_at: string; updated_at: string };
+export type Policy = { id: string; name: string; natural_language: string; policy_type: PolicyType; rule_ids: string[]; status: "draft" | "active" | "inactive"; version: number; created_at: string; updated_at: string };
 export type TestResult = { input_text: string; matched_rules: string[]; action: "blocked" | "masked" | "approval_required" | "passed"; reason: string; explanation: string };
 export type AuditEntry = { policy_id: string; policy_name: string; version_from: number | null; version_to: number; changed_by: string; change_reason: string; timestamp: string };
 export type Diff = { added: Rule[]; removed: Rule[]; unchanged: Rule[] };
@@ -24,10 +25,10 @@ export const api = {
 
   getPolicy: (id: string) => req<{ policy: Policy; rules: Rule[] }>(`/policies/${id}`),
 
-  createPolicy: (name: string, natural_language: string, change_reason: string) =>
+  createPolicy: (name: string, natural_language: string, change_reason: string, policy_type: PolicyType) =>
     req<{ policy: Policy; rules: Rule[] }>("/policies", {
       method: "POST",
-      body: JSON.stringify({ name, natural_language, change_reason }),
+      body: JSON.stringify({ name, natural_language, change_reason, policy_type }),
     }),
 
   updatePolicy: (id: string, natural_language: string, change_reason: string) =>
@@ -42,10 +43,10 @@ export const api = {
 
   toDraftPolicy: (id: string) => req<Policy>(`/policies/${id}/to-draft`, { method: "POST" }),
 
-  evaluate: (policy_id: string, input_text: string) =>
+  evaluate: (policy_id: string, input_text: string, output_text?: string) =>
     req<TestResult>("/evaluate", {
       method: "POST",
-      body: JSON.stringify({ policy_id, input_text }),
+      body: JSON.stringify({ policy_id, input_text, output_text }),
     }),
 
   getAuditLogs: () => req<AuditEntry[]>("/audit-logs"),
