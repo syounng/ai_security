@@ -79,10 +79,10 @@ data-driven 구조. 정책마다 코드가 늘지 않고 조건 템플릿을 해
 
 ```python
 conditions = {
-  "contains":   lambda text, val: val.lower() in text.lower(),
-  "regex":      lambda text, val: bool(re.search(val, text)),
-  "category":   lambda text, val: classifier.predict(text) == val,
-  "threshold":  lambda text, val: classifier.score(text) >= float(val),
+  "contains":  lambda text, val: val.lower() in text.lower(),
+  "regex":     lambda text, val: bool(re.search(val, text)),
+  "category":  lambda text, val: gemini_classify(text) == val,  # Gemini API 호출
+  "threshold": lambda text, val: gemini_score(text) >= float(val),  # Gemini API 호출
 }
 ```
 
