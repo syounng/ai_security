@@ -9,6 +9,13 @@ import DiffViewer from "@/components/DiffViewer";
 
 type Tab = "editor" | "test" | "audit";
 
+const TYPE_META: Record<string, { label: string; color: string }> = {
+  prompt_defense: { label: "🛡️ 프롬프트 방어", color: "text-blue-300 border-blue-700 bg-blue-950/30" },
+  sensitive_data: { label: "🔒 민감정보 보호", color: "text-yellow-300 border-yellow-700 bg-yellow-950/30" },
+  content_safety: { label: "⚠️ 콘텐츠 안전",  color: "text-orange-300 border-orange-700 bg-orange-950/30" },
+  compliance:     { label: "📋 컴플라이언스", color: "text-purple-300 border-purple-700 bg-purple-950/30" },
+};
+
 export default function Home() {
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
@@ -175,6 +182,11 @@ export default function Home() {
                         </span>
                       )}
                       <span className="text-xs text-gray-600 ml-auto">v{selectedPolicy.version}</span>
+                      {TYPE_META[selectedPolicy.policy_type] && (
+                        <span className={`px-2 py-0.5 rounded border text-xs font-medium ${TYPE_META[selectedPolicy.policy_type].color}`}>
+                          {TYPE_META[selectedPolicy.policy_type].label}
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 space-y-1">
                       <p><span className="text-gray-600">draft</span> — 작업 중인 초안. 아직 운영에 적용되지 않음.</p>
