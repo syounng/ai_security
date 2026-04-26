@@ -21,7 +21,7 @@ function RuleRow({ rule, type }: { rule: Rule; type: "added" | "removed" | "unch
       <span>
         <span className="font-semibold">{ACTION_KO[rule.action] ?? rule.action}</span>
         {" | "}
-        {rule.condition.type}:{rule.condition.value}
+        {rule.condition_type}:{rule.condition_value}
         {rule.description ? ` — ${rule.description}` : ""}
       </span>
     </div>

@@ -61,7 +61,7 @@ export default function TestHarness({ selectedPolicy }: Props) {
         <h2 className="text-lg font-semibold text-gray-100">{selectedPolicy.name}</h2>
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
           selectedPolicy.status === "active" ? "bg-green-800 text-green-300" :
-          selectedPolicy.status === "inactive" ? "bg-red-900 text-red-300" :
+          selectedPolicy.status === "archived" ? "bg-red-900 text-red-300" :
           "bg-gray-700 text-gray-400"
         }`}>{selectedPolicy.status}</span>
         <span className="text-xs text-gray-500">v{selectedPolicy.version}</span>

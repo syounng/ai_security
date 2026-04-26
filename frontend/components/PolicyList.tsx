@@ -12,7 +12,7 @@ type Props = {
 const STATUS_BADGE: Record<string, string> = {
   active:   "bg-green-800 text-green-300",
   draft:    "bg-gray-700 text-gray-400",
-  inactive: "bg-red-900 text-red-400",
+  archived: "bg-red-900 text-red-400",
 };
 
 export default function PolicyList({ policies, selectedId, onSelect, onDeploy, onRollback }: Props) {
@@ -39,7 +39,7 @@ export default function PolicyList({ policies, selectedId, onSelect, onDeploy, o
             </span>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            v{p.version} · {new Date(p.updated_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+            v{p.version} · {new Date(p.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
           </p>
           <div className="flex gap-1.5 mt-2" onClick={e => e.stopPropagation()}>
             {p.status !== "active" && (

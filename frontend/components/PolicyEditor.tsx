@@ -33,7 +33,7 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
     setSuggestion(null);
 
     if (selectedPolicy) {
-      api.getPolicy(selectedPolicy.id)
+      api.getPolicyVersion(selectedPolicy.policy_group_id, selectedPolicy.version)
         .then(res => setRules(res.rules))
         .catch(() => setRules([]));
     } else {
@@ -50,7 +50,7 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
     setSuggestion(null);
     try {
       if (isEditing) {
-        const res = await api.updatePolicy(selectedPolicy.id, naturalLanguage, changeReason || "정책 수정");
+        const res = await api.revisePolicy(selectedPolicy.policy_group_id, naturalLanguage, changeReason || "정책 수정");
         setRules(res.rules);
         onUpdated(res.policy, res.rules, res.diff);
       } else {
@@ -135,7 +135,7 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-indigo-300 font-semibold">{ACTION_LABELS[rule.action] ?? rule.action}</span>
                 <span className="text-gray-600">|</span>
-                <span className="text-gray-300 font-mono text-xs">{rule.condition.type}:{rule.condition.value}</span>
+                <span className="text-gray-300 font-mono text-xs">{rule.condition_type}:{rule.condition_value}</span>
               </div>
               {rule.description && <p className="text-gray-400 mt-1 text-xs">{rule.description}</p>}
             </div>
