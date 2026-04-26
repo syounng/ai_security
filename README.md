@@ -12,6 +12,40 @@ Guardrail Control Plane은 이 문제를 해결합니다.
 - **쉬운 등록·관리** — 변경 미리보기로 저장 전 룰을 확인하고, 배포(active) / 롤백 / 재검토(draft) 상태로 정책 수명주기를 관리합니다.
 - **불변 감사 로그** — 모든 정책 변경 이력이 Append-only 방식으로 기록되어 감사 추적이 가능합니다.
 
+### 화면 예시
+
+**정책 목록 & 상태 관리** — 왼쪽 사이드바에서 전체 정책을 한눈에 확인하고, 유형별 필터와 draft / active / archived 상태 전환 버튼으로 정책 수명주기를 관리합니다.
+
+![정책 목록 및 상태 관리](docs/screenshots/01-policy-list.png)
+
+---
+
+**자연어 정책 생성** — 정책 이름과 유형을 선택한 뒤, 일상적인 언어로 정책을 입력하면 Gemini가 실행 가능한 룰로 자동 변환합니다.
+
+![자연어 정책 생성](docs/screenshots/06-policy-create.png)
+
+---
+
+**정책 수정 & 변환된 룰 확인** — 기존 정책의 자연어 설명을 수정하면 Gemini가 룰을 재생성하고, 저장 전 변경안을 미리 검토할 수 있습니다.
+
+![정책 수정 및 룰 확인](docs/screenshots/02-policy-editor.png)
+
+---
+
+**실시간 입력 평가 테스트** — 샘플 입력 또는 직접 입력한 텍스트를 선택한 정책으로 즉시 평가합니다. 어떤 룰이 발동됐는지, 왜 해당 판정이 내려졌는지 설명과 함께 표시됩니다.
+
+![테스트 실행](docs/screenshots/03-test-harness.png)
+
+![테스트 결과 — APPROVAL REQUIRED](docs/screenshots/04-test-result.png)
+
+---
+
+**불변 감사 로그** — 모든 정책 생성·수정·배포·롤백 이력이 시간순으로 기록됩니다. 누가, 언제, 어떤 버전으로 변경했는지 추적할 수 있습니다.
+
+![Audit Log](docs/screenshots/05-audit-log.png)
+
+---
+
 ### 문서
 
 - [시스템 설계 및 기술 발표자료](docs/presentation.md)
