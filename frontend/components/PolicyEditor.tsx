@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { api, Policy, Rule, Diff, PolicyType } from "@/lib/api";
+import { api, Policy, Rule, Diff, PolicyType, PreviewResult } from "@/lib/api";
+import RuleChangePreviewModal from "./RuleChangePreviewModal";
 
 type Props = {
   selectedPolicy: Policy | null;
@@ -31,6 +32,9 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [pendingNaturalLanguage, setPendingNaturalLanguage] = useState<string>("");
+  const [applyLoading, setApplyLoading] = useState(false);
 
   useEffect(() => {
     setNaturalLanguage(selectedPolicy?.natural_language ?? "");
@@ -58,9 +62,9 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
     setSuggestion(null);
     try {
       if (isEditing) {
-        const res = await api.updatePolicy(selectedPolicy.id, naturalLanguage, changeReason || "정책 수정");
-        setRules(res.rules);
-        onUpdated(res.policy, res.rules, res.diff);
+        const res = await api.previewPolicy(selectedPolicy.id, naturalLanguage);
+        setPendingNaturalLanguage(naturalLanguage);
+        setPreview(res);
       } else {
         if (!name.trim()) { setError("정책 이름을 입력하세요."); setLoading(false); return; }
         const res = await api.createPolicy(name, naturalLanguage, changeReason || "최초 생성", policyType);
@@ -81,8 +85,34 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
     }
   };
 
+  const handleConfirmPreview = async () => {
+    if (!selectedPolicy || !preview) return;
+    setApplyLoading(true);
+    try {
+      const res = await api.updatePolicy(selectedPolicy.id, pendingNaturalLanguage, changeReason || "정책 수정");
+      setRules(res.rules);
+      setPreview(null);
+      onUpdated(res.policy, res.rules, res.diff);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      setPreview(null);
+    } finally {
+      setApplyLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
+      {preview && (
+        <RuleChangePreviewModal
+          diff={preview.diff}
+          proposedRules={preview.proposed_rules}
+          onConfirm={handleConfirmPreview}
+          onCancel={() => setPreview(null)}
+          loading={applyLoading}
+        />
+      )}
       <h2 className="text-lg font-semibold text-gray-100">
         {isEditing ? `정책 수정: ${selectedPolicy.name}` : "새 정책 생성"}
       </h2>
@@ -136,7 +166,7 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
         disabled={loading}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded px-4 py-2 text-sm font-medium transition-colors"
       >
-        {loading ? "Gemini로 변환 중..." : isEditing ? "정책 업데이트" : "정책 생성"}
+        {loading ? "Gemini 분석 중..." : isEditing ? "변경 미리보기" : "정책 생성"}
       </button>
 
       {error && (
