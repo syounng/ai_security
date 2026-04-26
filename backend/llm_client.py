@@ -175,7 +175,7 @@ Also add standalone payment keywords as individual contains rules:
 - 결제, payment, billing, 청구, 트랜잭션, charge, 카드 결제
 
 **Medical advice — one contains rule per keyword:**
-- 진단, 처방, 치료법, 약 복용, 약물, 증상, 의료, 수술, 처방전, 부작용, 복용법
+- 진단, 처방, 치료법, 약 복용, 약물, 증상, 의료, 수술, 처방전, 부작용, 복용법, 부상, 응급처치, 자문
 
 **Legal advice — one contains rule per keyword:**
 - 법률 상담, 법적 자문, 소송, 이혼, 계약서, 세금 신고, 법적으로 유효, 고소, 변호사
@@ -273,26 +273,30 @@ Input: {input_text}
 Respond with JSON only — no markdown:
 {{"action": "blocked" | "passed", "reason": "한 줄 이유 (Korean)"}}""",
 
-    "compliance": """You are a regulatory compliance and approval workflow expert.
+    "compliance": """You are a regulatory compliance and patient-safety expert.
 
-Evaluate whether the input requires human approval before proceeding:
+Evaluate whether the input requires human expert approval before the AI responds.
 
 APPROVAL_REQUIRED if it:
-- Requests EXECUTION of a payment, charge, billing, or financial transaction ("결제 처리해줘", "charge my card")
+- Requests EXECUTION of a payment, charge, billing, or financial transaction
 - Requests medical diagnosis, prescription, treatment plan, or drug dosage advice
+- Asks any health or first-aid question where a WRONG AI answer could directly cause physical harm
+  (wound treatment, medication interaction, emergency response, self-treatment methods, etc.)
 - Requests legal advice, contract review, lawsuit guidance, or official tax/financial filing
 - Requests specific investment, stock, or fund recommendations requiring licensed advice
 
 PASSED if it:
-- Asks for technical documentation, integration guides, or API usage instructions (even for payment systems)
-- Asks general how-to or educational questions about compliance-related topics
-- Is a normal request that does not actually execute a regulated action
+- Asks for technical documentation, integration guides, or API usage instructions
+- Asks general educational or conceptual questions with no direct harm risk if answered incorrectly
+- Is a normal request unrelated to regulated domains
 
-Examples:
-- "결제 처리해줘" → approval_required (execution request)
-- "결제 API 연동 방법 문서 알려줘" → passed (technical documentation, not execution)
-- "아스피린 복용법 알려줘" → passed (general info)
+Key distinction — APPROVAL_REQUIRED even when phrased as a casual question, if wrong information causes direct physical or financial harm:
+- "손을 다쳤는데 소주로 소독해도 돼?" → approval_required (health misinformation risk → physical harm)
+- "아스피린이랑 이부프로펜 같이 먹어도 돼?" → approval_required (drug interaction → physical harm)
 - "환자에게 아스피린 500mg 처방해줘" → approval_required (medical prescription)
+- "결제 처리해줘" → approval_required (financial execution)
+- "결제 API 연동 방법 문서 알려줘" → passed (technical docs, no harm risk)
+- "파이썬에서 날짜 포맷 바꾸는 법" → passed (unrelated to regulated domain)
 
 Input: {input_text}
 
