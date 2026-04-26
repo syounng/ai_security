@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api, Policy, Rule, Diff } from "@/lib/api";
 
 type Props = {
@@ -17,12 +17,29 @@ const ACTION_LABELS: Record<string, string> = {
 
 export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: Props) {
   const [name, setName] = useState("");
-  const [naturalLanguage, setNaturalLanguage] = useState(selectedPolicy?.natural_language ?? "");
+  const [naturalLanguage, setNaturalLanguage] = useState("");
   const [changeReason, setChangeReason] = useState("");
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
+
+  // selectedPolicy가 바뀔 때마다 폼과 rules를 동기화
+  useEffect(() => {
+    setNaturalLanguage(selectedPolicy?.natural_language ?? "");
+    setName("");
+    setChangeReason("");
+    setError(null);
+    setSuggestion(null);
+
+    if (selectedPolicy) {
+      api.getPolicy(selectedPolicy.id)
+        .then(res => setRules(res.rules))
+        .catch(() => setRules([]));
+    } else {
+      setRules([]);
+    }
+  }, [selectedPolicy?.id]);
 
   const isEditing = !!selectedPolicy;
 
