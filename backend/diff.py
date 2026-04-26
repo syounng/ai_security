@@ -3,7 +3,7 @@ from models import Rule
 
 
 def _sig(rule: Rule) -> str:
-    return f"{rule.action}:{rule.condition.type}:{rule.condition.value}"
+    return f"{rule.action}:{rule.condition_type}:{rule.condition_value}"
 
 
 def compute_diff(old_rules: List[Rule], new_rules: List[Rule]) -> dict:

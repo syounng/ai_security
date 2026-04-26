@@ -1,140 +1,165 @@
-import json
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Optional, Tuple, List
+from typing import Optional, List, Tuple
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+from orm_models import PolicyORM, RuleORM
 from models import Policy, Rule
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-POLICIES_FILE = DATA_DIR / "policies.json"
 
-
-def _load() -> dict:
-    return json.loads(POLICIES_FILE.read_text(encoding="utf-8"))
-
-
-def _save(data: dict) -> None:
-    POLICIES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-def get_all_policies() -> list[Policy]:
-    data = _load()
-    return [Policy(**p) for p in data["policies"]]
-
-
-def get_policy(policy_id: str) -> Optional[Policy]:
-    data = _load()
-    for p in data["policies"]:
-        if p["id"] == policy_id:
-            return Policy(**p)
-    return None
-
-
-def get_rules_for_policy(policy_id: str) -> list[Rule]:
-    data = _load()
-    return [Rule(**r) for r in data["rules"] if r["policy_id"] == policy_id]
-
-
-def get_rule(rule_id: str) -> Optional[Rule]:
-    data = _load()
-    for r in data["rules"]:
-        if r["id"] == rule_id:
-            return Rule(**r)
-    return None
-
-
-def create_policy(name: str, natural_language: str, rules_data: List[dict], policy_type: str = "content_safety") -> Tuple[Policy, List[Rule]]:
-    data = _load()
-    now = datetime.now(timezone.utc).isoformat()
-    policy_id = f"policy-{uuid.uuid4().hex[:8]}"
-
-    rules = []
-    rule_ids = []
-    for rd in rules_data:
-        rule_id = f"rule-{uuid.uuid4().hex[:8]}"
-        rule = Rule(
-            id=rule_id,
-            policy_id=policy_id,
-            action=rd["action"],
-            condition=rd["condition"],
-            description=rd.get("description", ""),
-        )
-        rules.append(rule)
-        rule_ids.append(rule_id)
-
-    policy = Policy(
-        id=policy_id,
-        name=name,
-        natural_language=natural_language,
-        policy_type=policy_type,
-        rule_ids=rule_ids,
-        status="draft",
-        version=1,
-        created_at=now,
-        updated_at=now,
+def _to_policy(p: PolicyORM) -> Policy:
+    return Policy(
+        id=p.id,
+        policy_group_id=p.policy_group_id,
+        name=p.name,
+        natural_language=p.natural_language,
+        status=p.status,
+        version=p.version,
+        created_at=p.created_at.isoformat() if p.created_at else "",
     )
 
-    data["policies"].append(policy.model_dump())
-    data["rules"].extend([r.model_dump() for r in rules])
-    _save(data)
-    return policy, rules
+
+def _to_rule(r: RuleORM) -> Rule:
+    return Rule(
+        id=r.id,
+        policy_id=r.policy_id,
+        action=r.action,
+        condition_type=r.condition_type,
+        condition_value=r.condition_value,
+        description=r.description,
+    )
 
 
-def update_policy(policy_id: str, natural_language: str, rules_data: List[dict]) -> Tuple[Policy, List[Rule]]:
-    data = _load()
-    now = datetime.now(timezone.utc).isoformat()
-
-    rules = []
-    rule_ids = []
+def _build_rules(db: Session, policy_id: str, rules_data: List[dict]) -> List[RuleORM]:
+    orms = []
     for rd in rules_data:
-        rule_id = f"rule-{uuid.uuid4().hex[:8]}"
-        rule = Rule(
-            id=rule_id,
+        orm = RuleORM(
+            id=f"rule-{uuid.uuid4().hex[:8]}",
             policy_id=policy_id,
             action=rd["action"],
-            condition=rd["condition"],
+            condition_type=rd["condition_type"],
+            condition_value=rd["condition_value"],
             description=rd.get("description", ""),
         )
-        rules.append(rule)
-        rule_ids.append(rule_id)
-
-    for p in data["policies"]:
-        if p["id"] == policy_id:
-            p["previous_rule_ids"] = p.get("rule_ids", [])
-            p["natural_language"] = natural_language
-            p["rule_ids"] = rule_ids
-            p["version"] += 1
-            p["updated_at"] = now
-
-    data["rules"].extend([r.model_dump() for r in rules])
-    _save(data)
-
-    policy = get_policy(policy_id)
-    return policy, rules
+        db.add(orm)
+        orms.append(orm)
+    return orms
 
 
-def deploy_policy(policy_id: str) -> Policy:
-    data = _load()
-    for p in data["policies"]:
-        if p["id"] == policy_id:
-            p["status"] = "active"
-    _save(data)
-    return get_policy(policy_id)
+def get_all_groups(db: Session) -> List[Policy]:
+    subq = (
+        db.query(PolicyORM.policy_group_id, func.max(PolicyORM.version).label("max_v"))
+        .group_by(PolicyORM.policy_group_id)
+        .subquery()
+    )
+    rows = (
+        db.query(PolicyORM)
+        .join(subq, (PolicyORM.policy_group_id == subq.c.policy_group_id) &
+                    (PolicyORM.version == subq.c.max_v))
+        .all()
+    )
+    return [_to_policy(r) for r in rows]
 
 
-def rollback_policy(policy_id: str) -> Policy:
-    data = _load()
-    for p in data["policies"]:
-        if p["id"] == policy_id:
-            p["status"] = "inactive"
-    _save(data)
-    return get_policy(policy_id)
+def get_policy_versions(db: Session, group_id: str) -> List[Policy]:
+    rows = (
+        db.query(PolicyORM)
+        .filter(PolicyORM.policy_group_id == group_id)
+        .order_by(PolicyORM.version.desc())
+        .all()
+    )
+    return [_to_policy(r) for r in rows]
 
 
-def to_draft_policy(policy_id: str) -> Policy:
-    data = _load()
-    for p in data["policies"]:
-        if p["id"] == policy_id:
-            p["status"] = "draft"
-    _save(data)
-    return get_policy(policy_id)
+def get_policy_by_id(db: Session, policy_id: str) -> Optional[Policy]:
+    row = db.query(PolicyORM).filter(PolicyORM.id == policy_id).first()
+    return _to_policy(row) if row else None
+
+
+def get_latest_policy(db: Session, group_id: str) -> Optional[Policy]:
+    row = (
+        db.query(PolicyORM)
+        .filter(PolicyORM.policy_group_id == group_id)
+        .order_by(PolicyORM.version.desc())
+        .first()
+    )
+    return _to_policy(row) if row else None
+
+
+def get_rules_for_policy(db: Session, policy_id: str) -> List[Rule]:
+    rows = db.query(RuleORM).filter(RuleORM.policy_id == policy_id).all()
+    return [_to_rule(r) for r in rows]
+
+
+def create_policy(db: Session, name: str, natural_language: str, rules_data: List[dict]) -> Tuple[Policy, List[Rule]]:
+    now = datetime.now(timezone.utc)
+    group_id = f"policy-{uuid.uuid4().hex[:8]}"
+    policy_id = f"{group_id}-v1"
+
+    orm = PolicyORM(
+        id=policy_id, policy_group_id=group_id, name=name,
+        natural_language=natural_language, status="draft", version=1, created_at=now,
+    )
+    db.add(orm)
+    rule_orms = _build_rules(db, policy_id, rules_data)
+    db.commit()
+    return _to_policy(orm), [_to_rule(r) for r in rule_orms]
+
+
+def revise_policy(db: Session, group_id: str, natural_language: str, rules_data: List[dict]) -> Tuple[Policy, List[Rule]]:
+    latest = get_latest_policy(db, group_id)
+    if not latest:
+        raise ValueError(f"Policy group {group_id} not found")
+
+    now = datetime.now(timezone.utc)
+    new_version = latest.version + 1
+    new_id = f"{group_id}-v{new_version}"
+
+    db.query(PolicyORM).filter(
+        PolicyORM.policy_group_id == group_id,
+        PolicyORM.status == "active",
+    ).update({"status": "archived"})
+
+    orm = PolicyORM(
+        id=new_id, policy_group_id=group_id, name=latest.name,
+        natural_language=natural_language, status="draft",
+        version=new_version, created_at=now,
+    )
+    db.add(orm)
+    rule_orms = _build_rules(db, new_id, rules_data)
+    db.commit()
+    return _to_policy(orm), [_to_rule(r) for r in rule_orms]
+
+
+def deploy_policy(db: Session, policy_id: str) -> Policy:
+    row = db.query(PolicyORM).filter(PolicyORM.id == policy_id).first()
+    if not row:
+        raise ValueError("Policy not found")
+    db.query(PolicyORM).filter(
+        PolicyORM.policy_group_id == row.policy_group_id,
+        PolicyORM.status == "active",
+    ).update({"status": "archived"})
+    db.refresh(row)
+    row.status = "active"
+    db.commit()
+    return _to_policy(row)
+
+
+def rollback_policy(db: Session, group_id: str) -> Policy:
+    versions = get_policy_versions(db, group_id)
+    if len(versions) < 2:
+        raise ValueError("No previous version to roll back to")
+
+    current = versions[0]
+    # Find most recently active version before current
+    previous = next(
+        (v for v in versions[1:] if v.status in ("active", "archived")),
+        None,
+    )
+    if not previous:
+        raise ValueError("No previous version to roll back to")
+
+    db.query(PolicyORM).filter(PolicyORM.id == current.id).update({"status": "archived"})
+    db.query(PolicyORM).filter(PolicyORM.id == previous.id).update({"status": "active"})
+    db.commit()
+    return get_policy_by_id(db, previous.id)

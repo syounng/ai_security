@@ -62,22 +62,20 @@ export default function Home() {
   };
 
   const handleDeploy = async (p: Policy) => {
-    await api.deployPolicy(p.id);
+    const updated = await api.deployPolicy(p.policy_group_id, p.version);
     refreshPolicies();
     refreshAudit();
-    if (selectedPolicy?.id === p.id) {
-      const updated = await api.getPolicy(p.id);
-      setSelectedPolicy(updated.policy);
+    if (selectedPolicy?.policy_group_id === p.policy_group_id) {
+      setSelectedPolicy(updated);
     }
   };
 
   const handleRollback = async (p: Policy) => {
-    await api.rollbackPolicy(p.id);
+    const updated = await api.rollbackPolicy(p.policy_group_id);
     refreshPolicies();
     refreshAudit();
-    if (selectedPolicy?.id === p.id) {
-      const updated = await api.getPolicy(p.id);
-      setSelectedPolicy(updated.policy);
+    if (selectedPolicy?.policy_group_id === p.policy_group_id) {
+      setSelectedPolicy(updated);
     }
   };
 
