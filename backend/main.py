@@ -5,7 +5,7 @@ import audit
 import rule_engine
 import llm_client
 import diff as diff_util
-from models import CreatePolicyRequest, UpdatePolicyRequest, EvaluateRequest, TestResult
+from models import CreatePolicyRequest, UpdatePolicyRequest, EvaluateRequest, TestResult, PreviewPolicyRequest
 
 app = FastAPI(title="Guardrail Control Plane")
 
@@ -180,3 +180,36 @@ def get_audit_logs():
 @app.get("/policies/{policy_id}/rules")
 def get_rules(policy_id: str):
     return [r.model_dump() for r in storage.get_rules_for_policy(policy_id)]
+
+
+@app.post("/policies/{policy_id}/preview")
+def preview_policy(policy_id: str, req: PreviewPolicyRequest):
+    policy = storage.get_policy(policy_id)
+    if not policy:
+        raise HTTPException(404, "Policy not found")
+    old_rules = storage.get_rules_for_policy(policy_id)
+
+    translation = llm_client.translate_natural_language(req.natural_language, policy.policy_type)
+    if not translation["success"]:
+        suggestion = llm_client.suggest_rephrasing(req.natural_language)
+        raise HTTPException(422, detail={"error": "번역 실패", "suggestion": suggestion})
+
+    from models import Rule
+    proposed_rules = [
+        {
+            "id": f"rule-preview-{i}",
+            "policy_id": policy_id,
+            "action": r["action"],
+            "condition": r["condition"],
+            "description": r.get("description", ""),
+        }
+        for i, r in enumerate(translation["rules"])
+    ]
+
+    proposed_rule_objs = [Rule(**r) for r in proposed_rules]
+    diff = diff_util.compute_diff(old_rules, proposed_rule_objs)
+
+    return {
+        "proposed_rules": proposed_rules,
+        "diff": diff,
+    }
