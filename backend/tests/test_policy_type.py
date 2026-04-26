@@ -33,3 +33,16 @@ def test_evaluate_request_accepts_output_text():
 def test_evaluate_request_output_text_optional():
     req = EvaluateRequest(policy_id="p1", input_text="hello")
     assert req.output_text is None
+
+import llm_client
+
+def test_translate_uses_prompt_defense_prompt():
+    assert "prompt_defense" in llm_client._PROMPTS_BY_TYPE
+    assert "sensitive_data" in llm_client._PROMPTS_BY_TYPE
+    assert "content_safety" in llm_client._PROMPTS_BY_TYPE
+    assert "compliance" in llm_client._PROMPTS_BY_TYPE
+
+def test_translate_signature_accepts_policy_type():
+    import inspect
+    sig = inspect.signature(llm_client.translate_natural_language)
+    assert "policy_type" in sig.parameters

@@ -10,25 +10,68 @@ load_dotenv(dotenv_path=str(Path(__file__).parent.parent / ".env"))
 _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 MODEL = "gemini-2.0-flash"
 
-_NL_TO_RULES_PROMPT = """You are a security policy translator. Convert the user's natural language security policy into structured JSON rules.
-
-Each rule must be a JSON object with:
+_BASE_RULE_FORMAT = """Each rule must be a JSON object with:
 - "action": one of "block", "mask", "approval", "pass"
 - "condition": object with "type" (one of "category", "contains", "regex") and "value"
   - For category use one of: "prompt_injection", "sensitive_data", "payment_api", "unsafe_action"
   - For contains/regex: use the literal pattern string
 - "description": short Korean explanation of what this rule does
 
-Return ONLY a JSON array. No markdown fences, no explanation, just the JSON array.
+Return ONLY a JSON array. No markdown fences, no explanation, just the JSON array."""
 
-Mapping hints:
-- "지시문 무시", "외부 문서", "프롬프트 인젝션" → block + category:prompt_injection
-- "주민번호", "카드번호", "API 키", "비밀번호", "마스킹" → mask + category:sensitive_data
-- "결제", "payment", "청구" + "승인/허가" → approval + category:payment_api
-- "시스템 종료", "rm -rf", "DB 삭제" → block + category:unsafe_action
+_PROMPTS_BY_TYPE = {
+    "prompt_defense": _BASE_RULE_FORMAT + """
+
+You are a prompt-injection defense specialist. Convert the user's policy into structured rules that detect adversarial inputs attempting to override AI instructions.
+
+Focus on:
+- Attempts to ignore/override/forget instructions → block + category:prompt_injection
+- Role-play or identity-change attacks ("act as", "you are now") → block + category:prompt_injection
+- System prompt extraction attempts → block + contains/regex
+- Indirect injection via documents/URLs → block + category:prompt_injection
 
 User policy:
-{natural_language}"""
+{natural_language}""",
+
+    "sensitive_data": _BASE_RULE_FORMAT + """
+
+You are a sensitive data protection specialist. Convert the user's policy into rules that detect and mask PII, credentials, and financial data in AI outputs.
+
+Focus on:
+- Korean resident registration numbers (주민번호) → mask + regex:\\d{6}-\\d{7}
+- Credit card numbers → mask + category:sensitive_data
+- API keys, passwords, secret tokens → mask + category:sensitive_data
+- Personal contact info (email, phone) → mask + regex patterns
+
+User policy:
+{natural_language}""",
+
+    "content_safety": _BASE_RULE_FORMAT + """
+
+You are a content safety specialist. Convert the user's policy into rules that detect harmful, unethical, or dangerous content in both user inputs and AI responses.
+
+Focus on:
+- Hate speech, harassment → block + contains/regex for slurs/threats
+- Dangerous system commands (rm -rf, DROP TABLE) → block + category:unsafe_action
+- Instructions for harmful activities → block + contains/regex
+- Self-harm or violence promotion → block + contains/regex
+
+User policy:
+{natural_language}""",
+
+    "compliance": _BASE_RULE_FORMAT + """
+
+You are a legal and compliance specialist. Convert the user's policy into rules that enforce business rules, regulatory requirements, and approval workflows.
+
+Focus on:
+- Payment/financial operations requiring approval → approval + category:payment_api
+- Professional advice (medical, legal, financial) → approval + contains/regex
+- Age-restricted content checks → block/approval + contains/regex
+- Regulated API access controls → approval + category:payment_api
+
+User policy:
+{natural_language}""",
+}
 
 _EXPLAIN_PROMPT = """A guardrail rule engine evaluated user input and took an action.
 
@@ -46,8 +89,9 @@ Suggest a clearer way to express this as a security policy in 1-2 Korean sentenc
 Return only the suggested text."""
 
 
-def translate_natural_language(natural_language: str) -> dict:
-    prompt = _NL_TO_RULES_PROMPT.format(natural_language=natural_language)
+def translate_natural_language(natural_language: str, policy_type: str = "content_safety") -> dict:
+    template = _PROMPTS_BY_TYPE.get(policy_type, _PROMPTS_BY_TYPE["content_safety"])
+    prompt = template.format(natural_language=natural_language)
     try:
         resp = _client.models.generate_content(model=MODEL, contents=prompt)
         text = resp.text.strip()
