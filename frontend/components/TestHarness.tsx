@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { api, Policy, TestResult, PolicyType } from "@/lib/api";
+import { api, Policy, TestResult } from "@/lib/api";
 
 type Props = { selectedPolicy: Policy | null };
 
@@ -25,21 +25,11 @@ const ACTION_LABELS: Record<string, string> = {
   passed:           "✅ PASSED",
 };
 
-const EVAL_STAGE: Record<PolicyType, { label: string; color: string; showOutput: boolean }> = {
-  prompt_defense: { label: "📥 입력 단계 평가", color: "text-blue-400 border-blue-800 bg-blue-950/30",       showOutput: false },
-  sensitive_data: { label: "📤 출력 단계 평가", color: "text-yellow-400 border-yellow-800 bg-yellow-950/30", showOutput: true },
-  content_safety: { label: "↕️ 입출력 단계 평가", color: "text-orange-400 border-orange-800 bg-orange-950/30", showOutput: true },
-  compliance:     { label: "📥 입력 단계 평가", color: "text-blue-400 border-blue-800 bg-blue-950/30",       showOutput: false },
-};
-
 export default function TestHarness({ selectedPolicy }: Props) {
   const [inputText, setInputText] = useState("");
-  const [outputText, setOutputText] = useState("");
   const [result, setResult] = useState<TestResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const stage = selectedPolicy ? (EVAL_STAGE[selectedPolicy.policy_type] ?? EVAL_STAGE.content_safety) : null;
 
   const runTest = async (text?: string) => {
     const target = text ?? inputText;
@@ -48,7 +38,7 @@ export default function TestHarness({ selectedPolicy }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.evaluate(selectedPolicy.id, target, outputText || undefined);
+      const res = await api.evaluate(selectedPolicy.id, target);
       setResult(res);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -67,7 +57,7 @@ export default function TestHarness({ selectedPolicy }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center gap-2">
         <h2 className="text-lg font-semibold text-gray-100">{selectedPolicy.name}</h2>
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
           selectedPolicy.status === "active" ? "bg-green-800 text-green-300" :
@@ -75,11 +65,6 @@ export default function TestHarness({ selectedPolicy }: Props) {
           "bg-gray-700 text-gray-400"
         }`}>{selectedPolicy.status}</span>
         <span className="text-xs text-gray-500">v{selectedPolicy.version}</span>
-        {stage && (
-          <span className={`text-xs px-2 py-0.5 rounded border font-medium ${stage.color}`}>
-            {stage.label}
-          </span>
-        )}
       </div>
 
       <div>
@@ -98,29 +83,12 @@ export default function TestHarness({ selectedPolicy }: Props) {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-xs text-gray-400">사용자 입력</label>
-        <textarea
-          className="w-full h-24 bg-gray-800 text-gray-100 border border-gray-600 rounded px-3 py-2 text-sm resize-none placeholder-gray-500"
-          placeholder="테스트 입력을 직접 넣으세요..."
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
-        />
-      </div>
-
-      {stage?.showOutput && (
-        <div className="space-y-2">
-          <label className="text-xs text-gray-400">
-            AI 응답 텍스트 <span className="text-gray-600">(이 정책 유형은 AI 출력을 평가합니다)</span>
-          </label>
-          <textarea
-            className="w-full h-24 bg-gray-800 text-gray-100 border border-gray-600 rounded px-3 py-2 text-sm resize-none placeholder-gray-500"
-            placeholder="AI가 생성한 응답 텍스트를 입력하세요..."
-            value={outputText}
-            onChange={e => setOutputText(e.target.value)}
-          />
-        </div>
-      )}
+      <textarea
+        className="w-full h-24 bg-gray-800 text-gray-100 border border-gray-600 rounded px-3 py-2 text-sm resize-none placeholder-gray-500"
+        placeholder="테스트 입력을 직접 넣으세요..."
+        value={inputText}
+        onChange={e => setInputText(e.target.value)}
+      />
 
       <button
         onClick={() => runTest()}
