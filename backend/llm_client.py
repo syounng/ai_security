@@ -278,12 +278,21 @@ Respond with JSON only — no markdown:
 Evaluate whether the input requires human approval before proceeding:
 
 APPROVAL_REQUIRED if it:
-- Requests execution of a payment, charge, billing, or financial transaction
+- Requests EXECUTION of a payment, charge, billing, or financial transaction ("결제 처리해줘", "charge my card")
 - Requests medical diagnosis, prescription, treatment plan, or drug dosage advice
 - Requests legal advice, contract review, lawsuit guidance, or official tax/financial filing
 - Requests specific investment, stock, or fund recommendations requiring licensed advice
 
-PASSED if it is a general question or request that does not require regulatory approval.
+PASSED if it:
+- Asks for technical documentation, integration guides, or API usage instructions (even for payment systems)
+- Asks general how-to or educational questions about compliance-related topics
+- Is a normal request that does not actually execute a regulated action
+
+Examples:
+- "결제 처리해줘" → approval_required (execution request)
+- "결제 API 연동 방법 문서 알려줘" → passed (technical documentation, not execution)
+- "아스피린 복용법 알려줘" → passed (general info)
+- "환자에게 아스피린 500mg 처방해줘" → approval_required (medical prescription)
 
 Input: {input_text}
 
