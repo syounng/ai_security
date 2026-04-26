@@ -53,7 +53,7 @@ def get_version(group_id: str, version: int, db: Session = Depends(get_db)):
 
 @app.post("/policies")
 def create_policy(req: CreatePolicyRequest, db: Session = Depends(get_db)):
-    result = translation.translate(req.natural_language)
+    result = translation.translate(req.natural_language, req.policy_type)
     if not result["success"]:
         suggestion = llm_client.suggest_rephrasing(req.natural_language)
         raise HTTPException(422, detail={"error": "번역 실패", "suggestion": suggestion})
@@ -80,7 +80,7 @@ def revise_policy(group_id: str, req: ReviseRequest, db: Session = Depends(get_d
     latest = versions[0]
     old_rules = storage.get_rules_for_policy(db, latest.id)
 
-    result = translation.translate(req.natural_language)
+    result = translation.translate(req.natural_language, latest.policy_type)
     if not result["success"]:
         suggestion = llm_client.suggest_rephrasing(req.natural_language)
         raise HTTPException(422, detail={"error": "번역 실패", "suggestion": suggestion})
@@ -152,9 +152,9 @@ def evaluate(req: EvaluateRequest, db: Session = Depends(get_db)):
     matched_objs = [r for r in rules if r.id in result["matched_rules"]]
     matched_descs = [r.description for r in matched_objs]
 
-    # 룰에 아무것도 안 걸린 경우 Gemini 2차 안전 판정 (무조건 위임)
+    # 룰에 아무것도 안 걸린 경우 Gemini 2차 안전 판정 — policy_type별 전문 프롬프트 사용
     if result["action"] == "passed" and not result["matched_rules"]:
-        judge = llm_client.safety_judge(req.input_text)
+        judge = llm_client.safety_judge_for_category(req.input_text, policy.policy_type)
         return TestResult(
             input_text=req.input_text,
             matched_rules=[],

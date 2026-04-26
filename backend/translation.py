@@ -49,11 +49,11 @@ def keyword_translate(natural_language: str) -> dict:
     return {"rules": rules, "success": success, "source": "code"}
 
 
-def translate(natural_language: str) -> dict:
+def translate(natural_language: str, policy_type: str = "content_safety") -> dict:
     result = keyword_translate(natural_language)
     if result["success"]:
         return result
 
     from llm_client import translate_natural_language
-    llm = translate_natural_language(natural_language)
+    llm = translate_natural_language(natural_language, policy_type)
     return {**llm, "source": "gemini"}
