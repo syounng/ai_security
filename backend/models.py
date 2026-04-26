@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Literal, Optional
+from typing import Literal, Optional, List
 
 
 class RuleCondition(BaseModel):
@@ -19,7 +19,7 @@ class Policy(BaseModel):
     id: str
     name: str
     natural_language: str
-    rule_ids: list[str]
+    rule_ids: List[str]
     status: Literal["draft", "active", "inactive"]
     version: int
     created_at: str
@@ -44,7 +44,7 @@ class EvaluateRequest(BaseModel):
 
 class TestResult(BaseModel):
     input_text: str
-    matched_rules: list[str]
+    matched_rules: List[str]
     action: Literal["blocked", "masked", "approval_required", "passed"]
     reason: str
     explanation: str
