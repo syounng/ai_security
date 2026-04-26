@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, DateTime
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
 from database import Base
 
 
@@ -19,7 +19,7 @@ class RuleORM(Base):
     __tablename__ = "rules"
 
     id = Column(String, primary_key=True)
-    policy_id = Column(String, nullable=False, index=True)
+    policy_id = Column(String, ForeignKey("policies.id"), nullable=False, index=True)
     action = Column(String, nullable=False)
     condition_type = Column(String, nullable=False)
     condition_value = Column(String, nullable=False)
