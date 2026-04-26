@@ -12,20 +12,27 @@ MODEL = "gemini-2.0-flash"
 
 _NL_TO_RULES_PROMPT = """You are a security policy translator. Convert the user's natural language security policy into structured JSON rules.
 
-Each rule must be a JSON object with:
+Each rule must be a JSON object with these EXACT fields (flat, no nesting):
 - "action": one of "block", "mask", "approval", "pass"
-- "condition": object with "type" (one of "category", "contains", "regex") and "value"
-  - For category use one of: "prompt_injection", "sensitive_data", "payment_api", "unsafe_action"
-  - For contains/regex: use the literal pattern string
+- "condition_type": one of "category", "contains", "regex"
+- "condition_value": string
+  - If condition_type is "category", use one of: "prompt_injection", "sensitive_data", "payment_api", "unsafe_action"
+  - If condition_type is "contains" or "regex": use the literal pattern string
 - "description": short Korean explanation of what this rule does
 
 Return ONLY a JSON array. No markdown fences, no explanation, just the JSON array.
 
 Mapping hints:
-- "지시문 무시", "외부 문서", "프롬프트 인젝션" → block + category:prompt_injection
-- "주민번호", "카드번호", "API 키", "비밀번호", "마스킹" → mask + category:sensitive_data
-- "결제", "payment", "청구" + "승인/허가" → approval + category:payment_api
-- "시스템 종료", "rm -rf", "DB 삭제" → block + category:unsafe_action
+- "지시문 무시", "외부 문서", "프롬프트 인젝션", "jailbreak" → block + category:prompt_injection
+- "주민번호", "카드번호", "API 키", "비밀번호", "마스킹", "개인정보" → mask + category:sensitive_data
+- "결제", "payment", "청구", "승인", "허가" → approval + category:payment_api
+- "시스템 종료", "rm -rf", "DB 삭제", "위험한 명령" → block + category:unsafe_action
+
+Example output:
+[
+  {"action": "block", "condition_type": "category", "condition_value": "prompt_injection", "description": "프롬프트 인젝션 차단"},
+  {"action": "mask", "condition_type": "category", "condition_value": "sensitive_data", "description": "민감정보 마스킹"}
+]
 
 User policy:
 {natural_language}"""
@@ -59,6 +66,12 @@ def translate_natural_language(natural_language: str) -> dict:
         rules_data = json.loads(text.strip())
         if not isinstance(rules_data, list) or len(rules_data) == 0:
             raise ValueError("Empty result from LLM")
+        # normalize old nested condition format if Gemini ignores new prompt
+        for r in rules_data:
+            if "condition" in r and "condition_type" not in r:
+                r["condition_type"] = r["condition"]["type"]
+                r["condition_value"] = r["condition"]["value"]
+                del r["condition"]
         return {"success": True, "rules": rules_data}
     except Exception as e:
         return {"success": False, "error": str(e), "rules": []}
