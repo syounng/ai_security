@@ -73,16 +73,17 @@ def evaluate(input_text: str, rules: List[Rule]) -> dict:
     matched_text: Optional[str] = None
 
     for rule in rules:
-        cond = rule.condition
         match = None
+        cond_type = rule.condition_type
+        cond_value = rule.condition_value
 
-        if cond.type == "category":
-            match = _match_category(input_text, cond.value)
-        elif cond.type == "contains":
-            if _match_contains(input_text, cond.value):
+        if cond_type == "category":
+            match = _match_category(input_text, cond_value)
+        elif cond_type == "contains":
+            if _match_contains(input_text, cond_value):
                 match = True
-        elif cond.type == "regex":
-            match = _match_regex(input_text, cond.value)
+        elif cond_type == "regex":
+            match = _match_regex(input_text, cond_value)
 
         if match:
             matched_rule_ids.append(rule.id)
