@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { api, Policy, Rule, Diff } from "@/lib/api";
+import { api, Policy, Rule, Diff, PolicyType } from "@/lib/api";
 
 type Props = {
   selectedPolicy: Policy | null;
@@ -15,16 +15,23 @@ const ACTION_LABELS: Record<string, string> = {
   pass: "✅ 통과",
 };
 
+const POLICY_TYPES: { value: PolicyType; label: string; desc: string }[] = [
+  { value: "prompt_defense",  label: "🛡️ 프롬프트 방어",   desc: "입력 단계 · 인젝션/공격 탐지" },
+  { value: "sensitive_data",  label: "🔒 민감정보 보호",   desc: "출력 단계 · PII/자격증명 마스킹" },
+  { value: "content_safety",  label: "⚠️ 콘텐츠 안전",    desc: "입출력 단계 · 유해 콘텐츠 탐지" },
+  { value: "compliance",      label: "📋 컴플라이언스",    desc: "입력 단계 · 법적/정책 규정 준수" },
+];
+
 export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: Props) {
   const [name, setName] = useState("");
   const [naturalLanguage, setNaturalLanguage] = useState("");
   const [changeReason, setChangeReason] = useState("");
+  const [policyType, setPolicyType] = useState<PolicyType>("content_safety");
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<string | null>(null);
 
-  // selectedPolicy가 바뀔 때마다 폼과 rules를 동기화
   useEffect(() => {
     setNaturalLanguage(selectedPolicy?.natural_language ?? "");
     setName("");
@@ -38,6 +45,7 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
         .catch(() => setRules([]));
     } else {
       setRules([]);
+      setPolicyType("content_safety");
     }
   }, [selectedPolicy?.id]);
 
@@ -55,7 +63,7 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
         onUpdated(res.policy, res.rules, res.diff);
       } else {
         if (!name.trim()) { setError("정책 이름을 입력하세요."); setLoading(false); return; }
-        const res = await api.createPolicy(name, naturalLanguage, changeReason || "최초 생성");
+        const res = await api.createPolicy(name, naturalLanguage, changeReason || "최초 생성", policyType);
         setRules(res.rules);
         onCreated(res.policy, res.rules);
       }
@@ -80,12 +88,33 @@ export default function PolicyEditor({ selectedPolicy, onCreated, onUpdated }: P
       </h2>
 
       {!isEditing && (
-        <input
-          className="w-full bg-gray-800 text-gray-100 border border-gray-600 rounded px-3 py-2 text-sm placeholder-gray-500"
-          placeholder="정책 이름 (예: 기본 보안 정책)"
-          value={name}
-          onChange={e => setName(e.target.value)}
-        />
+        <>
+          <input
+            className="w-full bg-gray-800 text-gray-100 border border-gray-600 rounded px-3 py-2 text-sm placeholder-gray-500"
+            placeholder="정책 이름 (예: 기본 보안 정책)"
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400 font-medium">정책 유형 선택</p>
+            <div className="grid grid-cols-2 gap-2">
+              {POLICY_TYPES.map(pt => (
+                <button
+                  key={pt.value}
+                  onClick={() => setPolicyType(pt.value)}
+                  className={`text-left rounded p-2.5 border text-xs transition-colors ${
+                    policyType === pt.value
+                      ? "bg-indigo-900/50 border-indigo-500 text-indigo-200"
+                      : "bg-gray-800 border-gray-600 text-gray-400 hover:border-gray-500"
+                  }`}
+                >
+                  <div className="font-medium">{pt.label}</div>
+                  <div className="text-gray-500 text-[10px] mt-0.5">{pt.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
 
       <textarea
