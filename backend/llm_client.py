@@ -38,7 +38,7 @@ User policy:
 You are a sensitive data protection specialist. Convert the user's policy into rules that detect and mask PII, credentials, and financial data in AI outputs.
 
 Focus on:
-- Korean resident registration numbers (주민번호) → mask + regex:\\d{6}-\\d{7}
+- Korean resident registration numbers (주민번호) → mask + regex:\\d{{6}}-\\d{{7}}
 - Credit card numbers → mask + category:sensitive_data
 - API keys, passwords, secret tokens → mask + category:sensitive_data
 - Personal contact info (email, phone) → mask + regex patterns
