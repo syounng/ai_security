@@ -43,7 +43,7 @@ def get_rule(rule_id: str) -> Optional[Rule]:
     return None
 
 
-def create_policy(name: str, natural_language: str, rules_data: List[dict]) -> Tuple[Policy, List[Rule]]:
+def create_policy(name: str, natural_language: str, rules_data: List[dict], policy_type: str = "content_safety") -> Tuple[Policy, List[Rule]]:
     data = _load()
     now = datetime.now(timezone.utc).isoformat()
     policy_id = f"policy-{uuid.uuid4().hex[:8]}"
@@ -66,6 +66,7 @@ def create_policy(name: str, natural_language: str, rules_data: List[dict]) -> T
         id=policy_id,
         name=name,
         natural_language=natural_language,
+        policy_type=policy_type,
         rule_ids=rule_ids,
         status="draft",
         version=1,

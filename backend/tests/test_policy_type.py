@@ -46,3 +46,24 @@ def test_translate_signature_accepts_policy_type():
     import inspect
     sig = inspect.signature(llm_client.translate_natural_language)
     assert "policy_type" in sig.parameters
+
+import storage as storage_mod
+import json as json_mod
+import tempfile
+import os as os_mod
+
+def test_create_policy_stores_policy_type(monkeypatch, tmp_path):
+    data_file = tmp_path / "policies.json"
+    data_file.write_text(json_mod.dumps({"policies": [], "rules": []}))
+    monkeypatch.setattr(storage_mod, "POLICIES_FILE", data_file)
+
+    policy, rules = storage_mod.create_policy(
+        name="test",
+        natural_language="block injection",
+        rules_data=[{"action": "block", "condition": {"type": "category", "value": "prompt_injection"}, "description": "test"}],
+        policy_type="prompt_defense",
+    )
+    assert policy.policy_type == "prompt_defense"
+
+    saved = json_mod.loads(data_file.read_text())
+    assert saved["policies"][0]["policy_type"] == "prompt_defense"

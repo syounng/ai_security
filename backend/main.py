@@ -38,12 +38,12 @@ def get_policy(policy_id: str):
 
 @app.post("/policies")
 def create_policy(req: CreatePolicyRequest):
-    translation = llm_client.translate_natural_language(req.natural_language)
+    translation = llm_client.translate_natural_language(req.natural_language, req.policy_type)
     if not translation["success"]:
         suggestion = llm_client.suggest_rephrasing(req.natural_language)
         raise HTTPException(422, detail={"error": "번역 실패", "suggestion": suggestion})
 
-    policy, rules = storage.create_policy(req.name, req.natural_language, translation["rules"])
+    policy, rules = storage.create_policy(req.name, req.natural_language, translation["rules"], req.policy_type)
     audit.record(
         policy_id=policy.id,
         policy_name=policy.name,
@@ -61,7 +61,7 @@ def update_policy(policy_id: str, req: UpdatePolicyRequest):
         raise HTTPException(404, "Policy not found")
     old_rules = storage.get_rules_for_policy(policy_id)
 
-    translation = llm_client.translate_natural_language(req.natural_language)
+    translation = llm_client.translate_natural_language(req.natural_language, old_policy.policy_type)
     if not translation["success"]:
         suggestion = llm_client.suggest_rephrasing(req.natural_language)
         raise HTTPException(422, detail={"error": "번역 실패", "suggestion": suggestion})
@@ -138,12 +138,26 @@ def evaluate(req: EvaluateRequest):
         raise HTTPException(404, "Policy not found")
     rules = storage.get_rules_for_policy(req.policy_id)
 
-    result = rule_engine.evaluate(req.input_text, rules)
+    _EVAL_STAGE = {
+        "prompt_defense": "input",
+        "sensitive_data": "output",
+        "content_safety": "both",
+        "compliance": "input",
+    }
+    stage = _EVAL_STAGE.get(policy.policy_type, "input")
+    if stage == "output" and req.output_text:
+        eval_text = req.output_text
+    elif stage == "both" and req.output_text:
+        eval_text = req.input_text + "\n\n" + req.output_text
+    else:
+        eval_text = req.input_text
+
+    result = rule_engine.evaluate(eval_text, rules)
     matched_rule_objs = [storage.get_rule(rid) for rid in result["matched_rules"]]
     matched_descs = [r.description for r in matched_rule_objs if r]
 
     explanation = llm_client.generate_explanation(
-        input_text=req.input_text,
+        input_text=eval_text,
         action=result["action"],
         matched_rules=matched_descs,
         matched_text=result.get("matched_text"),
