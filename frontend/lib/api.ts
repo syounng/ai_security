@@ -7,6 +7,7 @@ export type Policy = { id: string; name: string; natural_language: string; polic
 export type TestResult = { input_text: string; matched_rules: string[]; action: "blocked" | "masked" | "approval_required" | "passed"; reason: string; explanation: string };
 export type AuditEntry = { policy_id: string; policy_name: string; version_from: number | null; version_to: number; changed_by: string; change_reason: string; timestamp: string };
 export type Diff = { added: Rule[]; removed: Rule[]; unchanged: Rule[] };
+export type PreviewResult = { proposed_rules: Rule[]; diff: Diff };
 
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -35,6 +36,12 @@ export const api = {
     req<{ policy: Policy; rules: Rule[]; diff: Diff }>(`/policies/${id}`, {
       method: "PUT",
       body: JSON.stringify({ natural_language, change_reason }),
+    }),
+
+  previewPolicy: (id: string, natural_language: string) =>
+    req<PreviewResult>(`/policies/${id}/preview`, {
+      method: "POST",
+      body: JSON.stringify({ natural_language }),
     }),
 
   deployPolicy: (id: string) => req<Policy>(`/policies/${id}/deploy`, { method: "POST" }),
