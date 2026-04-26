@@ -86,11 +86,38 @@ conditions = {
 }
 ```
 
+### Rule Translation Pipeline (Fallback 구조)
+
+자연어 → rule JSON 변환은 2단계 파이프라인으로 처리한다.
+
+```
+자연어 입력
+    │
+    ▼
+[1단계] 키워드 매핑 (순수 코드)
+    ├─ rule 1개 이상 매핑 AND 미인식 표현 없음 → 결과 반환 (Gemini 호출 안 함)
+    └─ rule 0개 OR 미인식 표현 있음
+            ↓
+        [2단계] Gemini API fallback
+            ├─ rule 반환 성공 → 결과 반환
+            └─ unrecognized_phrases 있음 → UI에 재입력 요청
+```
+
+반환 시 `source` 필드("code" / "gemini")를 포함해 UI에서 처리 방식을 표시한다.
+
+**키워드 매핑 테이블 (1단계):**
+
+| 키워드 | action | condition_value |
+|--------|--------|-----------------|
+| 무시해줘, 숨겨진 지시문, 외부 문서 | block | prompt_injection |
+| 마스킹, 주민번호, 비밀번호, API 키 | mask | sensitive_data |
+| 승인, 허가, 사람 확인, 결제 API | approval | payment_api |
+
 ### Gemini API 사용처
 
 | 용도 | 모델 | 출력 |
 |------|------|------|
-| 자연어 → Rule JSON | gemini-2.0-flash | `response_schema` 구조화 출력 |
+| 자연어 → Rule JSON (fallback) | gemini-2.0-flash | `response_schema` 구조화 출력 |
 | 차단 사유 설명 | gemini-2.0-flash | 자유 텍스트 (1~2문장) |
 | 테스트 시나리오 제안 | gemini-2.0-flash | 자유 텍스트 리스트 |
 
