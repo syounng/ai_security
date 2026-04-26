@@ -139,6 +139,7 @@ def deploy_policy(db: Session, policy_id: str) -> Policy:
         PolicyORM.policy_group_id == row.policy_group_id,
         PolicyORM.status == "active",
     ).update({"status": "archived"})
+    db.refresh(row)
     row.status = "active"
     db.commit()
     return _to_policy(row)
@@ -147,8 +148,17 @@ def deploy_policy(db: Session, policy_id: str) -> Policy:
 def rollback_policy(db: Session, group_id: str) -> Policy:
     versions = get_policy_versions(db, group_id)
     if len(versions) < 2:
-        raise ValueError("롤백할 이전 버전이 없습니다")
-    current, previous = versions[0], versions[1]
+        raise ValueError("No previous version to roll back to")
+
+    current = versions[0]
+    # Find most recently active version before current
+    previous = next(
+        (v for v in versions[1:] if v.status in ("active", "archived")),
+        None,
+    )
+    if not previous:
+        raise ValueError("No previous version to roll back to")
+
     db.query(PolicyORM).filter(PolicyORM.id == current.id).update({"status": "archived"})
     db.query(PolicyORM).filter(PolicyORM.id == previous.id).update({"status": "active"})
     db.commit()
