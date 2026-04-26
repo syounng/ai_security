@@ -40,6 +40,8 @@ export const api = {
 
   rollbackPolicy: (id: string) => req<Policy>(`/policies/${id}/rollback`, { method: "POST" }),
 
+  toDraftPolicy: (id: string) => req<Policy>(`/policies/${id}/to-draft`, { method: "POST" }),
+
   evaluate: (policy_id: string, input_text: string) =>
     req<TestResult>("/evaluate", {
       method: "POST",

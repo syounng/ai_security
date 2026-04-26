@@ -115,6 +115,22 @@ def rollback_policy(policy_id: str):
     return updated.model_dump()
 
 
+@app.post("/policies/{policy_id}/to-draft")
+def to_draft_policy(policy_id: str):
+    policy = storage.get_policy(policy_id)
+    if not policy:
+        raise HTTPException(404, "Policy not found")
+    updated = storage.to_draft_policy(policy_id)
+    audit.record(
+        policy_id=policy_id,
+        policy_name=policy.name,
+        version_from=policy.version,
+        version_to=policy.version,
+        change_reason="초안으로 전환 (재검토)",
+    )
+    return updated.model_dump()
+
+
 @app.post("/evaluate")
 def evaluate(req: EvaluateRequest):
     policy = storage.get_policy(req.policy_id)

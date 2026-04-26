@@ -74,6 +74,16 @@ export default function Home() {
     }
   };
 
+  const handleToDraft = async (p: Policy) => {
+    await api.toDraftPolicy(p.id);
+    refreshPolicies();
+    refreshAudit();
+    if (selectedPolicy?.id === p.id) {
+      const updated = await api.getPolicy(p.id);
+      setSelectedPolicy(updated.policy);
+    }
+  };
+
   const selectPolicy = (p: Policy) => {
     setSelectedPolicy(p);
     setLastDiff(null);
@@ -145,6 +155,76 @@ export default function Home() {
           <div className="flex-1 overflow-y-auto p-6">
             {activeTab === "editor" && (
               <div className="max-w-2xl space-y-4">
+                {selectedPolicy && (
+                  <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-400 font-medium">현재 상태</span>
+                      {selectedPolicy.status === "active" && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-900/50 text-green-300 border border-green-700">
+                          운영중 (active)
+                        </span>
+                      )}
+                      {selectedPolicy.status === "draft" && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-900/50 text-yellow-300 border border-yellow-700">
+                          작업중 (draft)
+                        </span>
+                      )}
+                      {selectedPolicy.status === "inactive" && (
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-900/50 text-red-300 border border-red-700">
+                          롤백됨 (inactive)
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-600 ml-auto">v{selectedPolicy.version}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p><span className="text-gray-600">draft</span> — 작업 중인 초안. 아직 운영에 적용되지 않음.</p>
+                      <p><span className="text-gray-600">active</span> — 현재 운영 중인 정책. 모든 요청에 적용됨.</p>
+                      <p><span className="text-gray-600">inactive</span> — 롤백된 비활성 상태. 요청에 적용되지 않음.</p>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedPolicy.status === "draft" && (
+                        <button
+                          onClick={() => handleDeploy(selectedPolicy)}
+                          className="text-xs bg-green-800/50 hover:bg-green-700/60 text-green-300 border border-green-700 rounded px-3 py-1.5 transition-colors"
+                        >
+                          🚀 배포 (active 전환)
+                        </button>
+                      )}
+                      {selectedPolicy.status === "active" && (
+                        <>
+                          <button
+                            onClick={() => handleRollback(selectedPolicy)}
+                            className="text-xs bg-red-900/40 hover:bg-red-800/50 text-red-300 border border-red-700 rounded px-3 py-1.5 transition-colors"
+                          >
+                            ⏪ 롤백 (inactive 전환)
+                          </button>
+                          <button
+                            onClick={() => handleToDraft(selectedPolicy)}
+                            className="text-xs bg-yellow-900/40 hover:bg-yellow-800/50 text-yellow-300 border border-yellow-700 rounded px-3 py-1.5 transition-colors"
+                          >
+                            📝 초안으로 (draft 전환)
+                          </button>
+                        </>
+                      )}
+                      {selectedPolicy.status === "inactive" && (
+                        <>
+                          <button
+                            onClick={() => handleDeploy(selectedPolicy)}
+                            className="text-xs bg-green-800/50 hover:bg-green-700/60 text-green-300 border border-green-700 rounded px-3 py-1.5 transition-colors"
+                          >
+                            🚀 재배포 (active 전환)
+                          </button>
+                          <button
+                            onClick={() => handleToDraft(selectedPolicy)}
+                            className="text-xs bg-yellow-900/40 hover:bg-yellow-800/50 text-yellow-300 border border-yellow-700 rounded px-3 py-1.5 transition-colors"
+                          >
+                            📝 초안으로 (draft 전환)
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <PolicyEditor
                   selectedPolicy={selectedPolicy}
                   onCreated={handleCreated}

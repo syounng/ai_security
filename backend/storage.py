@@ -125,11 +125,15 @@ def rollback_policy(policy_id: str) -> Policy:
     data = _load()
     for p in data["policies"]:
         if p["id"] == policy_id:
-            prev = p.get("previous_rule_ids", [])
-            if prev:
-                p["rule_ids"], p["previous_rule_ids"] = prev, p["rule_ids"]
-                p["version"] = max(1, p["version"] - 1)
-                p["updated_at"] = datetime.now(timezone.utc).isoformat()
+            p["status"] = "inactive"
+    _save(data)
+    return get_policy(policy_id)
+
+
+def to_draft_policy(policy_id: str) -> Policy:
+    data = _load()
+    for p in data["policies"]:
+        if p["id"] == policy_id:
             p["status"] = "draft"
     _save(data)
     return get_policy(policy_id)
