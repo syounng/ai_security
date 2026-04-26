@@ -1,13 +1,19 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 import storage
 import audit
 import rule_engine
+import translation
 import llm_client
 import diff as diff_util
-from models import CreatePolicyRequest, UpdatePolicyRequest, EvaluateRequest, TestResult
+from database import get_db, engine
+import orm_models
+from models import CreatePolicyRequest, ReviseRequest, EvaluateRequest, TestResult
 
-app = FastAPI(title="Guardrail Control Plane")
+orm_models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Guardrail Control Plane v2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,56 +29,69 @@ def health():
 
 
 @app.get("/policies")
-def list_policies():
-    return [p.model_dump() for p in storage.get_all_policies()]
+def list_policies(db: Session = Depends(get_db)):
+    return [p.model_dump() for p in storage.get_all_groups(db)]
 
 
-@app.get("/policies/{policy_id}")
-def get_policy(policy_id: str):
-    policy = storage.get_policy(policy_id)
+@app.get("/policies/{group_id}/versions")
+def get_versions(group_id: str, db: Session = Depends(get_db)):
+    versions = storage.get_policy_versions(db, group_id)
+    if not versions:
+        raise HTTPException(404, "Policy group not found")
+    return [v.model_dump() for v in versions]
+
+
+@app.get("/policies/{group_id}/versions/{version}")
+def get_version(group_id: str, version: int, db: Session = Depends(get_db)):
+    policy_id = f"{group_id}-v{version}"
+    policy = storage.get_policy_by_id(db, policy_id)
     if not policy:
-        raise HTTPException(404, "Policy not found")
-    rules = storage.get_rules_for_policy(policy_id)
+        raise HTTPException(404, "Policy version not found")
+    rules = storage.get_rules_for_policy(db, policy_id)
     return {"policy": policy.model_dump(), "rules": [r.model_dump() for r in rules]}
 
 
 @app.post("/policies")
-def create_policy(req: CreatePolicyRequest):
-    translation = llm_client.translate_natural_language(req.natural_language)
-    if not translation["success"]:
+def create_policy(req: CreatePolicyRequest, db: Session = Depends(get_db)):
+    result = translation.translate(req.natural_language)
+    if not result["success"]:
         suggestion = llm_client.suggest_rephrasing(req.natural_language)
         raise HTTPException(422, detail={"error": "번역 실패", "suggestion": suggestion})
-
-    policy, rules = storage.create_policy(req.name, req.natural_language, translation["rules"])
+    policy, rules = storage.create_policy(db, req.name, req.natural_language, result["rules"])
     audit.record(
-        policy_id=policy.id,
+        policy_group_id=policy.policy_group_id,
         policy_name=policy.name,
         version_from=None,
         version_to=policy.version,
         change_reason=req.change_reason,
     )
-    return {"policy": policy.model_dump(), "rules": [r.model_dump() for r in rules]}
+    return {
+        "policy": policy.model_dump(),
+        "rules": [r.model_dump() for r in rules],
+        "translation_source": result["source"],
+    }
 
 
-@app.put("/policies/{policy_id}")
-def update_policy(policy_id: str, req: UpdatePolicyRequest):
-    old_policy = storage.get_policy(policy_id)
-    if not old_policy:
-        raise HTTPException(404, "Policy not found")
-    old_rules = storage.get_rules_for_policy(policy_id)
+@app.post("/policies/{group_id}/revise")
+def revise_policy(group_id: str, req: ReviseRequest, db: Session = Depends(get_db)):
+    versions = storage.get_policy_versions(db, group_id)
+    if not versions:
+        raise HTTPException(404, "Policy group not found")
+    latest = versions[0]
+    old_rules = storage.get_rules_for_policy(db, latest.id)
 
-    translation = llm_client.translate_natural_language(req.natural_language)
-    if not translation["success"]:
+    result = translation.translate(req.natural_language)
+    if not result["success"]:
         suggestion = llm_client.suggest_rephrasing(req.natural_language)
         raise HTTPException(422, detail={"error": "번역 실패", "suggestion": suggestion})
 
-    policy, new_rules = storage.update_policy(policy_id, req.natural_language, translation["rules"])
+    policy, new_rules = storage.revise_policy(db, group_id, req.natural_language, result["rules"])
     diff = diff_util.compute_diff(old_rules, new_rules)
 
     audit.record(
-        policy_id=policy.id,
+        policy_group_id=group_id,
         policy_name=policy.name,
-        version_from=old_policy.version,
+        version_from=latest.version,
         version_to=policy.version,
         change_reason=req.change_reason,
     )
@@ -80,51 +99,58 @@ def update_policy(policy_id: str, req: UpdatePolicyRequest):
         "policy": policy.model_dump(),
         "rules": [r.model_dump() for r in new_rules],
         "diff": diff,
+        "translation_source": result["source"],
     }
 
 
-@app.post("/policies/{policy_id}/deploy")
-def deploy_policy(policy_id: str):
-    policy = storage.get_policy(policy_id)
+@app.get("/policies/{group_id}/diff")
+def get_diff(group_id: str, from_v: int, to_v: int, db: Session = Depends(get_db)):
+    from_rules = storage.get_rules_for_policy(db, f"{group_id}-v{from_v}")
+    to_rules = storage.get_rules_for_policy(db, f"{group_id}-v{to_v}")
+    if not from_rules and not to_rules:
+        raise HTTPException(404, "Version not found")
+    return diff_util.compute_diff(from_rules, to_rules)
+
+
+@app.post("/policies/{group_id}/versions/{version}/deploy")
+def deploy_policy(group_id: str, version: int, db: Session = Depends(get_db)):
+    policy_id = f"{group_id}-v{version}"
+    policy = storage.get_policy_by_id(db, policy_id)
     if not policy:
         raise HTTPException(404, "Policy not found")
-    updated = storage.deploy_policy(policy_id)
+    updated = storage.deploy_policy(db, policy_id)
     audit.record(
-        policy_id=policy_id,
-        policy_name=policy.name,
-        version_from=policy.version,
-        version_to=policy.version,
+        policy_group_id=group_id, policy_name=updated.name,
+        version_from=policy.version, version_to=policy.version,
         change_reason="배포 (active 전환)",
     )
     return updated.model_dump()
 
 
-@app.post("/policies/{policy_id}/rollback")
-def rollback_policy(policy_id: str):
-    policy = storage.get_policy(policy_id)
-    if not policy:
-        raise HTTPException(404, "Policy not found")
-    updated = storage.rollback_policy(policy_id)
+@app.post("/policies/{group_id}/rollback")
+def rollback_policy(group_id: str, db: Session = Depends(get_db)):
+    versions = storage.get_policy_versions(db, group_id)
+    if len(versions) < 2:
+        raise HTTPException(400, "롤백할 이전 버전이 없습니다")
+    updated = storage.rollback_policy(db, group_id)
     audit.record(
-        policy_id=policy_id,
-        policy_name=policy.name,
-        version_from=policy.version,
-        version_to=policy.version,
-        change_reason="롤백 (inactive 전환)",
+        policy_group_id=group_id, policy_name=updated.name,
+        version_from=versions[0].version, version_to=updated.version,
+        change_reason="롤백",
     )
     return updated.model_dump()
 
 
 @app.post("/evaluate")
-def evaluate(req: EvaluateRequest):
-    policy = storage.get_policy(req.policy_id)
+def evaluate(req: EvaluateRequest, db: Session = Depends(get_db)):
+    policy = storage.get_policy_by_id(db, req.policy_id)
     if not policy:
         raise HTTPException(404, "Policy not found")
-    rules = storage.get_rules_for_policy(req.policy_id)
+    rules = storage.get_rules_for_policy(db, req.policy_id)
 
     result = rule_engine.evaluate(req.input_text, rules)
-    matched_rule_objs = [storage.get_rule(rid) for rid in result["matched_rules"]]
-    matched_descs = [r.description for r in matched_rule_objs if r]
+    matched_objs = [r for r in rules if r.id in result["matched_rules"]]
+    matched_descs = [r.description for r in matched_objs]
 
     explanation = llm_client.generate_explanation(
         input_text=req.input_text,
@@ -132,13 +158,13 @@ def evaluate(req: EvaluateRequest):
         matched_rules=matched_descs,
         matched_text=result.get("matched_text"),
     )
-
     return TestResult(
         input_text=req.input_text,
         matched_rules=result["matched_rules"],
         action=result["action"],
         reason=matched_descs[0] if matched_descs else "매칭된 규칙 없음",
         explanation=explanation,
+        translation_source="rule_engine",
     ).model_dump()
 
 
@@ -147,6 +173,6 @@ def get_audit_logs():
     return [e.model_dump() for e in audit.get_all()]
 
 
-@app.get("/policies/{policy_id}/rules")
-def get_rules(policy_id: str):
-    return [r.model_dump() for r in storage.get_rules_for_policy(policy_id)]
+@app.get("/audit-logs/{group_id}")
+def get_audit_logs_for_group(group_id: str):
+    return [e.model_dump() for e in audit.get_by_group(group_id)]
