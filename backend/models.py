@@ -48,6 +48,7 @@ class TestResult(BaseModel):
     reason: str
     explanation: str
     translation_source: str
+    gemini_error: bool = False
 
 
 class AuditEntry(BaseModel):

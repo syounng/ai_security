@@ -29,6 +29,7 @@ export type TestResult = {
   reason: string;
   explanation: string;
   translation_source: string;
+  gemini_error: boolean;
 };
 
 export type AuditEntry = {

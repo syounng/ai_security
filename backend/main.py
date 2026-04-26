@@ -152,18 +152,18 @@ def evaluate(req: EvaluateRequest, db: Session = Depends(get_db)):
     matched_objs = [r for r in rules if r.id in result["matched_rules"]]
     matched_descs = [r.description for r in matched_objs]
 
-    # 룰에 아무것도 안 걸린 경우 Gemini 2차 안전 판정
+    # 룰에 아무것도 안 걸린 경우 Gemini 2차 안전 판정 (무조건 위임)
     if result["action"] == "passed" and not result["matched_rules"]:
         judge = llm_client.safety_judge(req.input_text)
-        if not judge["safe"]:
-            return TestResult(
-                input_text=req.input_text,
-                matched_rules=[],
-                action=judge["action"],
-                reason=judge["reason"],
-                explanation=judge["reason"],
-                translation_source="gemini",
-            ).model_dump()
+        return TestResult(
+            input_text=req.input_text,
+            matched_rules=[],
+            action=judge["action"],
+            reason=judge["reason"],
+            explanation=judge["reason"],
+            translation_source="gemini",
+            gemini_error=judge.get("gemini_error", False),
+        ).model_dump()
 
     explanation = llm_client.generate_explanation(
         input_text=req.input_text,

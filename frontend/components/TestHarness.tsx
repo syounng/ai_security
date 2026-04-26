@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { api, Policy, TestResult } from "@/lib/api";
 
 type Props = { selectedPolicy: Policy | null };
@@ -25,11 +25,21 @@ const ACTION_LABELS: Record<string, string> = {
   passed:           "✅ PASSED",
 };
 
+const SOURCE_LABEL: Record<string, { text: string; color: string }> = {
+  rule_engine:   { text: "⚡ Rule Engine",        color: "bg-indigo-900 border-indigo-600 text-indigo-300" },
+  gemini:        { text: "✨ Gemini API",          color: "bg-purple-900 border-purple-600 text-purple-300" },
+  gemini_error:  { text: "⚠️ Gemini API 연결 실패", color: "bg-red-900 border-red-600 text-red-300" },
+};
+
 export default function TestHarness({ selectedPolicy }: Props) {
   const [inputText, setInputText] = useState("");
   const [result, setResult] = useState<TestResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toastSource, setToastSource] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const runTest = async (text?: string) => {
     const target = text ?? inputText;
@@ -40,6 +50,10 @@ export default function TestHarness({ selectedPolicy }: Props) {
     try {
       const res = await api.evaluate(selectedPolicy.id, target);
       setResult(res);
+      const sourceKey = res.gemini_error ? "gemini_error" : res.translation_source;
+      setToastSource(sourceKey);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToastSource(null), res.gemini_error ? 4000 : 2500);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -99,6 +113,17 @@ export default function TestHarness({ selectedPolicy }: Props) {
       </button>
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
+
+      {/* Processing path toast */}
+      <div className={`fixed top-4 right-4 z-50 transition-all duration-500 ${
+        toastSource ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"
+      }`}>
+        {toastSource && SOURCE_LABEL[toastSource] && (
+          <div className={`text-xs font-medium px-3 py-1.5 rounded border ${SOURCE_LABEL[toastSource].color}`}>
+            {SOURCE_LABEL[toastSource].text}
+          </div>
+        )}
+      </div>
 
       {result && (
         <div className={`border rounded p-4 space-y-2 ${ACTION_STYLES[result.action] ?? ""}`}>
